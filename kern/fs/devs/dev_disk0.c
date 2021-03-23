@@ -27,16 +27,36 @@ unlock_disk0(void) {
     up(&(disk0_sem));
 }
 
+/**
+ * 打开函数, 没有实际作用, 因为disk0作为一个磁盘始终是打开的
+ * 对应 struct device 中的 d_open 函数
+ **/
 static int
 disk0_open(struct device *dev, uint32_t open_flags) {
     return 0;
 }
 
+/**
+ * 关闭函数, 没有实际作用, 因为disk0作为一个磁盘不存在关闭的说法
+ * 对应 struct device 中的 d_close 函数
+ **/
 static int
 disk0_close(struct device *dev) {
     return 0;
 }
 
+/** 
+ * 从磁盘扇区按块读取到内存, 无锁
+ * 在 disk0_io 函数中被调用
+ * 
+ * 读取从 @blkno 开始的 @nblks 个块到 @disk0_buffer
+ * 读取失败会给出panic, 但没有返回值
+ * 
+ * 块大小为 DISK0_BLKSIZE = PGSIZE = 4096
+ * 扇区大小为 SECTSIZE = 512
+ * disk0_buffer大小为 DISK0_BUFSIZE = 4 * DISK0_BLKSIZE
+ * (是否意味着nblks必须不大于4?)
+ **/
 static void
 disk0_read_blks_nolock(uint32_t blkno, uint32_t nblks) {
     int ret;
@@ -47,6 +67,13 @@ disk0_read_blks_nolock(uint32_t blkno, uint32_t nblks) {
     }
 }
 
+/**
+ * 从内存按块写入到磁盘扇区, 无锁
+ * 在 disk0_io 函数中被调用
+ * 
+ * 从 @disk_buffer 写入到磁盘从 @blkno 开始的 @nblks 个块
+ * 写入失败会给出panic, 但没有返回值
+ **/
 static void
 disk0_write_blks_nolock(uint32_t blkno, uint32_t nblks) {
     int ret;
@@ -57,6 +84,15 @@ disk0_write_blks_nolock(uint32_t blkno, uint32_t nblks) {
     }
 }
 
+/**
+ * disk0的io操作接口实现
+ * 对应 struct device 中的 d_io 函数
+ * 
+ * 根据 @write 的值确定方向, 完成 @iob 和 @disk_buffer 的数据交换
+ * 然后，调用磁盘块读写函数将数据持久化到磁盘中
+ * 
+ * 要求iobuf的偏移量和剩余长度必须是整数个块
+ **/
 static int
 disk0_io(struct device *dev, struct iobuf *iob, bool write) {
     off_t offset = iob->io_offset;
@@ -103,11 +139,24 @@ disk0_io(struct device *dev, struct iobuf *iob, bool write) {
     return 0;
 }
 
+
+/**
+ * io控制函数, 没有实际作用
+ * 对应 struct device 中的 d_ioctl 函数
+ **/
 static int
 disk0_ioctl(struct device *dev, int op, void *data) {
     return -E_UNIMP;
 }
 
+/**
+ * 对disk0的struct device进行初始化
+ * 被dev_init_disk0调用
+ * 
+ * 初始化struct device的各项内容
+ * 初始化设备互斥信号量
+ * 为disk0缓冲区disk0_buffer分配空间
+ **/
 static void
 disk0_device_init(struct device *dev) {
     static_assert(DISK0_BLKSIZE % SECTSIZE == 0);
@@ -128,6 +177,14 @@ disk0_device_init(struct device *dev) {
     }
 }
 
+/**
+ * 完成vfs中的device的初始化
+ * 被dev_init调用
+ * 
+ * 在vfs中为disk0创建一个inode
+ * 将struct inode中的in_info域看作struct device进行初始化
+ * 完成后将inode加入到vfs的device表中
+ **/
 void
 dev_init_disk0(void) {
     struct inode *node;

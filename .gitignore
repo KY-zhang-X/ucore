@@ -8,6 +8,7 @@
 *.elf
 bin/
 obj/
+disk0/
 
 # Linker output
 *.ilk

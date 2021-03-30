@@ -12,6 +12,11 @@
 #include <assert.h>
 
 // device info entry in vdev_list 
+/**
+ * 此数据结构用双向链表将inode和device联通起来
+ * ucore可以通过此链表访问所有的设备文件 
+ * 可以找到device对应的inode
+ */ 
 typedef struct {
     const char *devname;
     struct inode *devnode;

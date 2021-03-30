@@ -13,7 +13,12 @@
 
 #define testfd(fd)                          ((fd) >= 0 && (fd) < FILES_STRUCT_NENTRY)
 
-// get_fd_array - get current process's open files table
+
+/*
+ * 
+ *  
+ */
+// get_fd_array - get current process's open files tabl
 static struct file *
 get_fd_array(void) {
     struct files_struct *filesp = current->filesp;

@@ -38,11 +38,11 @@
  * On-disk superblock
  */
 /**
-magic：值为 0x2f8dbe2a，内核通过它来检查磁盘镜像是否是合法的 SFS img
-block：文件系统所包含的块的数量
-unused_blocks：文件系统中没有使用的块的数量
-info：包含了字符串”simple file system”
- */
+* magic：值为 0x2f8dbe2a，内核通过它来检查磁盘镜像是否是合法的 SFS img
+* block：文件系统所包含的块的数量
+* unused_blocks：文件系统中没有使用的块的数量
+* info：包含了字符串”simple file system”
+*/
 struct sfs_super {
     uint32_t magic;                                 /* magic number, should be SFS_MAGIC */
     uint32_t blocks;                                /* # of blocks in fs */
@@ -51,6 +51,13 @@ struct sfs_super {
 };
 
 /* inode (on disk) */
+/**磁盘上的inode
+ * 如果inode是常规文件size文件大小
+ * inode的文件类型
+ * 此inode的硬链接数
+ * 直接索引快索引值(有SFS_NDIRECT=12个，每个4K)
+ * 一级间接数据块索引值,0表示不使用间接索引
+ */
 struct sfs_disk_inode {
     uint32_t size;                                  /* size of the file (in bytes) */
     uint16_t type;                                  /* one of SYS_TYPE_* above */
@@ -63,6 +70,12 @@ struct sfs_disk_inode {
 };
 
 /* file entry (on disk) */
+/**
+ * name 表示目录下文件或文件夹的名称，ino 表示磁盘 block 编号(每个inode直接使用他所在磁盘编号作为inode编号)，
+ * 通过读取该 block 的数据，能够得到相应的文件或文件夹的 inode。
+ * ino 为 0 时，表示一个无效的 entry。
+ * 
+**/ 
 struct sfs_disk_entry {
     uint32_t ino;                                   /* inode number */
     char name[SFS_MAX_FNAME_LEN + 1];               /* file name */
@@ -72,6 +85,15 @@ struct sfs_disk_entry {
     sizeof(((struct sfs_disk_entry *)0)->name)
 
 /* inode for sfs */
+/**
+ * din 磁盘上的inode
+ * ino ino的编号
+ * dirty 表示此inode是否被修改过
+ * reclaim 当reclaim_count=0的时候从内存中删除这个索引节点
+ * sem 这个din的信号量
+ * inode_link inode链表
+ * hash_link inode哈系表
+ */ 
 struct sfs_inode {
     struct sfs_disk_inode *din;                     /* on-disk inode */
     uint32_t ino;                                   /* inode number */

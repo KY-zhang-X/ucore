@@ -11,6 +11,11 @@ struct inode;
 struct stat;
 struct dirent;
 
+
+/**
+ * 指定文件文件系统的相关类型，包括读写权限，文件描述符fd,当前读到的位置POS
+ * 文件系统中与硬盘特定区域所对应的节点node，以及打开此文件次数open_count
+ */ 
 struct file {
     enum {
         FD_NONE, FD_INIT, FD_OPENED, FD_CLOSED,

@@ -28,8 +28,8 @@ struct iobuf;
  */
 
 /**
- *in_info表示包含不同文件系统特定的inode信息
- *
+ * in_info 表示包含不同文件系统特定的inode信息
+ * 
  */
 struct inode {
     union {

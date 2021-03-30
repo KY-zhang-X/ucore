@@ -26,6 +26,11 @@ struct iobuf;
  * vfs_open() and vfs_close(). Code above the VFS layer should not
  * need to worry about it.
  */
+
+/**
+ *in_info表示包含不同文件系统特定的inode信息
+ *
+ */
 struct inode {
     union {
         struct device __device_info;

@@ -37,6 +37,12 @@
 /*
  * On-disk superblock
  */
+/**
+magic：值为 0x2f8dbe2a，内核通过它来检查磁盘镜像是否是合法的 SFS img
+block：文件系统所包含的块的数量
+unused_blocks：文件系统中没有使用的块的数量
+info：包含了字符串”simple file system”
+ */
 struct sfs_super {
     uint32_t magic;                                 /* magic number, should be SFS_MAGIC */
     uint32_t blocks;                                /* # of blocks in fs */

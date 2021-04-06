@@ -15,7 +15,7 @@
 
 
 /*
- * 
+ * 返回当前执行进程的文件打开表
  *  
  */
 // get_fd_array - get current process's open files tabl
@@ -26,6 +26,9 @@ get_fd_array(void) {
     return filesp->fd_array;
 }
 
+/**
+ * 返回
+ */ 
 // fd_array_init - initialize the open files table
 void
 fd_array_init(struct file *fd_array) {
@@ -66,7 +69,9 @@ found:
     *file_store = file;
     return 0;
 }
-
+/**
+ * 释放一个文件的内存空间
+ */ 
 // fd_array_free - free a file item in open files table
 static void
 fd_array_free(struct file *file) {
@@ -94,6 +99,11 @@ fd_array_release(struct file *file) {
     }
 }
 
+/**
+ * 打开文件
+ * file->open_count++
+ * file->status = FD_OPENED;
+ */ 
 // fd_array_open - file's open_count++, set status to FD_OPENED
 void
 fd_array_open(struct file *file) {
@@ -102,6 +112,11 @@ fd_array_open(struct file *file) {
     fopen_count_inc(file);
 }
 
+/**
+ * 关闭一个文件
+ * 如果此文件的全局文件打开表为0
+ * 则释放此文件的内存空间
+ */ 
 // fd_array_close - file's open_count--; if file's open_count-- == 0 , then call fd_array_free to free this file item
 void
 fd_array_close(struct file *file) {
@@ -113,6 +128,10 @@ fd_array_close(struct file *file) {
     }
 }
 
+
+/**
+ * 
+ */ 
 //fs_array_dup - duplicate file 'from'  to file 'to'
 void
 fd_array_dup(struct file *to, struct file *from) {

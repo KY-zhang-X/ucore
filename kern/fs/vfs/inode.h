@@ -29,7 +29,11 @@ struct iobuf;
 
 /**
  * in_info 表示包含不同文件系统特定的inode信息
- * 
+ * in_type inode所属的文件系统类型，和in_info对应
+ * ref_count inode的引用计数
+ * open_count 打开此inode对应文件的个数
+ * in_fs 抽象文件系统,包含访问文件系统的函数指针
+ * in_ops 抽象的inode操作，包含访问inode的函数指针
  */
 struct inode {
     union {

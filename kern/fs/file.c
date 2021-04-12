@@ -11,14 +11,16 @@
 #include <error.h>
 #include <assert.h>
 
+/* fd条件范围判断 */
 #define testfd(fd)                          ((fd) >= 0 && (fd) < FILES_STRUCT_NENTRY)
 
 
+
+// get_fd_array - get current process's open files tabl
 /*
  * 返回当前执行进程的文件打开表
  *  
  */
-// get_fd_array - get current process's open files tabl
 static struct file *
 get_fd_array(void) {
     struct files_struct *filesp = current->filesp;
@@ -26,10 +28,13 @@ get_fd_array(void) {
     return filesp->fd_array;
 }
 
-/**
- * 返回
- */ 
+ 
 // fd_array_init - initialize the open files table
+/**
+ * 在进程文件数据结构初始化时调用files_create，也是进程初始化时调用
+ * 初始化进程的文件打开表
+ * 把所有表中所有文件状态写为FD_NONE
+ */
 void
 fd_array_init(struct file *fd_array) {
     int fd;
@@ -40,7 +45,16 @@ fd_array_init(struct file *fd_array) {
     }
 }
 
+
 // fs_array_alloc - allocate a free file item (with FD_NONE status) in open files table
+
+/**
+ * @brief 给当前进程的文件打开表分配一个表项
+ * 
+ * @param fd 文件描述符
+ * @param file_store 分配地址
+ * @return 
+ */
 static int
 fd_array_alloc(int fd, struct file **file_store) {
 //    panic("debug");
@@ -83,12 +97,21 @@ fd_array_free(struct file *file) {
     file->status = FD_NONE;
 }
 
+/**
+ * @brief 请求访问文件，该文件的open_count++
+ * 
+ * @param file 
+ */
 static void
 fd_array_acquire(struct file *file) {
-    assert(file->status == FD_OPENED);
+    assert(file->status == FD_OPENED); /* 这个函数是读文件调用，先打开再读 */
     fopen_count_inc(file);
 }
 
+/**
+ * @brief 取消对文件的访问，该文件的open_count--,如果open_count为0,即访问该文件的进程为0时调用fd_array_free释放该文件的内存空间。
+ * 
+ */
 // fd_array_release - file's open_count--; if file's open_count-- == 0 , then call fd_array_free to free this file item
 static void
 fd_array_release(struct file *file) {
@@ -147,6 +170,13 @@ fd_array_dup(struct file *to, struct file *from) {
 }
 
 // fd2file - use fd as index of fd_array, return the array item (file)
+/**
+ * @brief 通过fd得到当前进程对应文件打开表的file文件
+ * 
+ * @param fd 想得到的文件的文件描述符
+ * @param file_store 存储结果
+ * @return int 成功返回0
+ */
 static inline int
 fd2file(int fd, struct file **file_store) {
     if (testfd(fd)) {
@@ -160,6 +190,15 @@ fd2file(int fd, struct file **file_store) {
 }
 
 // file_testfd - test file is readble or writable?
+/**
+ * @brief 检测fd对应文件的读写权限，和参数一样返回1,不一样或者没有fd返回0
+ * 
+ * @param fd 
+ * @param readable 
+ * @param writable 
+ * @return true 
+ * @return false 
+ */
 bool
 file_testfd(int fd, bool readable, bool writable) {
     int ret;
@@ -176,11 +215,21 @@ file_testfd(int fd, bool readable, bool writable) {
     return 1;
 }
 
+
 // open file
+/**
+ * @brief 被sysfile_open調用
+ *        通用文件系统接口
+ *        打开path目录下的文件
+ * @param path 打开文件目录
+ * @param open_flags 读写方式
+ * @return int 返回fd
+ */
 int
 file_open(char *path, uint32_t open_flags) {
     bool readable = 0, writable = 0;
-    switch (open_flags & O_ACCMODE) {
+    switch (open_flags & O_ACCMODE) { //0_ACCMODE是掩码，取后三位
+    /* 读写模式:只读，只写，读写 */
     case O_RDONLY: readable = 1; break;
     case O_WRONLY: writable = 1; break;
     case O_RDWR:
@@ -189,7 +238,7 @@ file_open(char *path, uint32_t open_flags) {
     default:
         return -E_INVAL;
     }
-
+ 
     int ret;
     struct file *file;
     if ((ret = fd_array_alloc(NO_FD, &file)) != 0) {
@@ -203,7 +252,7 @@ file_open(char *path, uint32_t open_flags) {
     }
 
     file->pos = 0;
-    if (open_flags & O_APPEND) {
+    if (open_flags & O_APPEND) { /* 取openflag第二位即打开方式为读写 */
         struct stat __stat, *stat = &__stat;
         if ((ret = vop_fstat(node, stat)) != 0) {
             vfs_close(node);
@@ -221,6 +270,12 @@ file_open(char *path, uint32_t open_flags) {
 }
 
 // close file
+/**
+ * @brief 被sysfile_close調用
+ *        通用文件接口层关闭文件
+ * @param fd 关闭文件的文件描述符
+ * @return int 成功返回0
+ */
 int
 file_close(int fd) {
     int ret;
@@ -233,6 +288,15 @@ file_close(int fd) {
 }
 
 // read file
+/**
+ * @brief 通用文件接口读文件
+ * 
+ * @param fd 
+ * @param base 
+ * @param len 数据长度最大IOBUF_SIZE
+ * @param copied_store 长度的地址
+ * @return int 
+ */
 int
 file_read(int fd, void *base, size_t len, size_t *copied_store) {
     int ret;
@@ -244,9 +308,9 @@ file_read(int fd, void *base, size_t len, size_t *copied_store) {
     if (!file->readable) {
         return -E_INVAL;
     }
-    fd_array_acquire(file);
+    fd_array_acquire(file); 
 
-    struct iobuf __iob, *iob = iobuf_init(&__iob, base, len, file->pos);
+    struct iobuf __iob, *iob = iobuf_init(&__iob, base, len, file->pos); /* 初始化iob */
     ret = vop_read(file->node, iob);
 
     size_t copied = iobuf_used(iob);
@@ -259,6 +323,16 @@ file_read(int fd, void *base, size_t len, size_t *copied_store) {
 }
 
 // write file
+
+/**
+ * @brief 通用文件接口写文件，下层调用vop_write接口
+ * 
+ * @param fd 
+ * @param base 
+ * @param len 数据长度
+ * @param copied_store 长度的地址
+ * @return int
+ */
 int
 file_write(int fd, void *base, size_t len, size_t *copied_store) {
     int ret;

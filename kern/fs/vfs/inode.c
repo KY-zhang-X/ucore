@@ -11,6 +11,13 @@
 /* *
  * __alloc_inode - alloc a inode structure and initialize in_type
  * */
+
+/**
+ * @brief 分配一个inode并且初始化in_type
+ * 
+ * @param type in_type类型
+ * @return struct inode* 
+ */
 struct inode *
 __alloc_inode(int type) {
     struct inode *node;

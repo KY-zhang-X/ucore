@@ -57,13 +57,21 @@ sysfile_close(int fd) {
 }
 
 /* sysfile_read - read file */
+/**
+ * @brief 系统调用接口
+ * 
+ * @param fd 文件描述符
+ * @param base 
+ * @param len 
+ * @return int 
+ */
 int
 sysfile_read(int fd, void *base, size_t len) {
     struct mm_struct *mm = current->mm;
     if (len == 0) {
         return 0;
     }
-    if (!file_testfd(fd, 1, 0)) {
+    if (!file_testfd(fd, 1, 0)) { /* 读写权限检查 */
         return -E_INVAL;
     }
     void *buffer;
@@ -198,6 +206,7 @@ sysfile_chdir(const char *__path) {
 }
 
 /* sysfile_link - link file */
+/* unimplement */
 int
 sysfile_link(const char *__path1, const char *__path2) {
     int ret;
@@ -215,6 +224,7 @@ sysfile_link(const char *__path1, const char *__path2) {
 }
 
 /* sysfile_rename - rename file */
+/* unimplement */
 int
 sysfile_rename(const char *__path1, const char *__path2) {
     int ret;

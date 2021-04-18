@@ -29,7 +29,11 @@ struct iobuf;
 
 /**
  * in_info 表示包含不同文件系统特定的inode信息
- * 
+ * in_type inode所属的文件系统类型，和in_info对应
+ * ref_count inode的引用计数
+ * open_count 打开此inode对应文件的个数
+ * in_fs 抽象文件系统,包含访问文件系统的函数指针
+ * in_ops 抽象的inode操作，包含访问inode的函数指针
  */
 struct inode {
     union {
@@ -155,6 +159,8 @@ void inode_kill(struct inode *node);
  *                      of the file and copy to the specified io buffer. 
  *                      Need not work on objects that are not
  *                      directories.
+ *                      计算相对于文件文件系统根目录的路径名，并将其复制到指定的io缓冲区。
+ *                      不需要在不是目录的对象上工作。
  *
  *****************************************
  *
@@ -238,12 +244,23 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_open_inc(node)                                          inode_open_inc(node)
 #define vop_open_dec(node)                                          inode_open_dec(node)
 
-
+/**
+ * @brief 返回当前inode引用计数node->ref_count
+ * 
+ * @param node 
+ * @return int 
+ */
 static inline int
 inode_ref_count(struct inode *node) {
     return node->ref_count;
 }
 
+/**
+ * @brief 返回打开此inode对应文件个数node->open_count
+ * 
+ * @param node 
+ * @return int 
+ */
 static inline int
 inode_open_count(struct inode *node) {
     return node->open_count;

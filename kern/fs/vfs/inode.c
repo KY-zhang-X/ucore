@@ -13,6 +13,13 @@
  * 为inode动态分配内存, 并设定inode的type
  * TODO: 由于传了type的参数, 是否可以针对不同类型的文件系统, 为inode分配不同大小的内存(不使用union的方式)
  * */
+
+/**
+ * @brief 分配一个inode并且初始化in_type
+ * 
+ * @param type in_type类型
+ * @return struct inode* 
+ */
 struct inode *
 __alloc_inode(int type) {
     struct inode *node;
@@ -34,6 +41,14 @@ __alloc_inode(int type) {
  * in_fs: 指向该inode归属的文件系统
  * //TODO: 引用计数的含义, 以及最后引用加一的意思
  * */
+
+/**
+ * @brief 初始inode 被vop_init()调用
+ * 
+ * @param node 
+ * @param ops 
+ * @param fs 
+ */
 void
 inode_init(struct inode *node, const struct inode_ops *ops, struct fs *fs) {
     node->ref_count = 0;
@@ -46,6 +61,12 @@ inode_init(struct inode *node, const struct inode_ops *ops, struct fs *fs) {
  * inode_kill - kill a inode structure
  * invoked by vop_kill
  * */
+
+/**
+ * @brief 释放一个inode内存空间
+ * 
+ * @param node inode地址
+ */
 void
 inode_kill(struct inode *node) {
     assert(inode_ref_count(node) == 0);
@@ -57,6 +78,13 @@ inode_kill(struct inode *node) {
  * inode_ref_inc - increment ref_count
  * invoked by vop_ref_inc
  * */
+
+/**
+ * @brief inode引用计数ref_count+1，vop_ref_inc宏调用
+ * 
+ * @param node 
+ * @return int 返回当前inode引用
+ */
 int
 inode_ref_inc(struct inode *node) {
     node->ref_count += 1;
@@ -68,6 +96,13 @@ inode_ref_inc(struct inode *node) {
  * invoked by vop_ref_dec
  * calls vop_reclaim if the ref_count hits zero
  * */
+
+/**
+ * @brief inode引用计数ref_count-1，vop_ref_dec宏调用
+ *        如果ref_count减到0调用vop_reclaim
+ * @param node 
+ * @return int 
+ */
 int
 inode_ref_dec(struct inode *node) {
     assert(inode_ref_count(node) > 0);
@@ -86,6 +121,13 @@ inode_ref_dec(struct inode *node) {
  * inode_open_inc - increment the open_count
  * invoked by vop_open_inc
  * */
+
+/**
+ * @brief inode文件打开计数open_count++
+ * 
+ * @param node 
+ * @return int 
+ */
 int
 inode_open_inc(struct inode *node) {
     node->open_count += 1;
@@ -97,6 +139,13 @@ inode_open_inc(struct inode *node) {
  * invoked by vop_open_dec
  * calls vop_close if the open_count hits zero
  * */
+
+/**
+ * @brief 文件打开计数open_count--  
+ *        如果打开计数为0,调用vop_close
+ * @param node 
+ * @return int 
+ */
 int
 inode_open_dec(struct inode *node) {
     assert(inode_open_count(node) > 0);
@@ -115,6 +164,13 @@ inode_open_dec(struct inode *node) {
  * inode_check - check the various things being valid
  * called before all vop_* calls
  * */
+
+/**
+ * @brief 调用vop_foo操作前进行检查，判断一致性
+ * 
+ * @param node 
+ * @param opstr 
+ */
 void
 inode_check(struct inode *node, const char *opstr) {
     assert(node != NULL && node->in_ops != NULL);

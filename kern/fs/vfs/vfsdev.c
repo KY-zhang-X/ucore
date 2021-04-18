@@ -48,6 +48,11 @@ vfs_devlist_init(void) {
 }
 
 // vfs_cleanup - finally clean (or sync) fs
+
+/**
+ * @brief 将文件系统同步到硬盘
+ * 
+ */
 void
 vfs_cleanup(void) {
     if (!list_empty(&vdev_list)) {
@@ -68,6 +73,14 @@ vfs_cleanup(void) {
 /*
  * vfs_get_root - Given a device name (stdin, stdout, etc.), hand
  *                back an appropriate inode.
+ */
+
+/**
+ * @brief 根据设备名称获取对应的root的inode
+ * 
+ * @param devname 设备名称
+ * @param node_store 接受inode地址
+ * @return int 成功返回0
  */
 int
 vfs_get_root(const char *devname, struct inode **node_store) {
@@ -105,6 +118,13 @@ vfs_get_root(const char *devname, struct inode **node_store) {
 
 /*
  * vfs_get_devname - Given a filesystem, hand back the name of the device it's mounted on.
+ */
+
+/**
+ * @brief 获得文件系统挂载的设备名
+ * 
+ * @param fs 
+ * @return const char* 
  */
 const char *
 vfs_get_devname(struct fs *fs) {

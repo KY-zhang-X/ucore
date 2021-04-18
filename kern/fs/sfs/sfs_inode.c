@@ -34,6 +34,7 @@ unlock_sin(struct sfs_inode *sin) {
 
 /*
  * sfs_get_ops - return function addr of fs_node_dirops/sfs_node_fileops
+ * 返回文件系统对应文件类型的操作
  */
 static const struct inode_ops *
 sfs_get_ops(uint16_t type) {
@@ -48,6 +49,7 @@ sfs_get_ops(uint16_t type) {
 
 /*
  * sfs_hash_list - return inode entry in sfs->hash_list
+ * 通过哈希表快速找到inode表项
  */
 static list_entry_t *
 sfs_hash_list(struct sfs_fs *sfs, uint32_t ino) {
@@ -56,6 +58,7 @@ sfs_hash_list(struct sfs_fs *sfs, uint32_t ino) {
 
 /*
  * sfs_set_links - link inode sin in sfs->linked-list AND sfs->hash_link
+ * 将sfs_inode添加到链表中
  */
 static void
 sfs_set_links(struct sfs_fs *sfs, struct sfs_inode *sin) {
@@ -65,6 +68,7 @@ sfs_set_links(struct sfs_fs *sfs, struct sfs_inode *sin) {
 
 /*
  * sfs_remove_links - unlink inode sin in sfs->linked-list AND sfs->hash_link
+ * 将sfs_inode从链表中删除
  */
 static void
 sfs_remove_links(struct sfs_inode *sin) {
@@ -74,6 +78,7 @@ sfs_remove_links(struct sfs_inode *sin) {
 
 /*
  * sfs_block_inuse - check the inode with NO. ino inuse info in bitmap
+ * 查询对应块是否被使用
  */
 static bool
 sfs_block_inuse(struct sfs_fs *sfs, uint32_t ino) {
@@ -85,6 +90,7 @@ sfs_block_inuse(struct sfs_fs *sfs, uint32_t ino) {
 
 /*
  * sfs_block_alloc -  check and get a free disk block
+ * 分配一个空闲块, 可用于inode或数据
  */
 static int
 sfs_block_alloc(struct sfs_fs *sfs, uint32_t *ino_store) {
@@ -100,6 +106,7 @@ sfs_block_alloc(struct sfs_fs *sfs, uint32_t *ino_store) {
 
 /*
  * sfs_block_free - set related bits for ino block to 1(means free) in bitmap, add sfs->super.unused_blocks, set superblock dirty *
+ * 释放一个块
  */
 static void
 sfs_block_free(struct sfs_fs *sfs, uint32_t ino) {

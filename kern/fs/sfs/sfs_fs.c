@@ -145,6 +145,12 @@ sfs_init_freemap(struct device *dev, struct bitmap *freemap, uint32_t blkno, uin
  * @dev:        the block device contains sfs file system
  * @fs_store:   the fs struct in memroy
  */
+/**
+ * @brief 挂载sfs文件系统
+ * 
+ * @param dev 找到的设备
+ * @param fs_store 返回的文件系统结构体
+ **/
 static int
 sfs_do_mount(struct device *dev, struct fs **fs_store) {
     static_assert(SFS_BLKSIZE >= sizeof(struct sfs_super));
@@ -156,27 +162,32 @@ sfs_do_mount(struct device *dev, struct fs **fs_store) {
     }
 
     /* allocate fs structure */
+    /* 为fs结构体分配内存空间 */
     struct fs *fs;
     if ((fs = alloc_fs(sfs)) == NULL) {
         return -E_NO_MEM;
     }
+    /* 将fs结构体中的fs_info字段视为sfs_fs结构体, 与设备结构体关联 */
     struct sfs_fs *sfs = fsop_info(fs, sfs);
     sfs->dev = dev;
 
     int ret = -E_NO_MEM;
 
+    /* 为sfs_fs结构体中的buffer分配内存空间 */
     void *sfs_buffer;
     if ((sfs->sfs_buffer = sfs_buffer = kmalloc(SFS_BLKSIZE)) == NULL) {
         goto failed_cleanup_fs;
     }
 
     /* load and check superblock */
+    /* 读块设备的0号块(superblock)到sfs_fs的buffer中 */
     if ((ret = sfs_init_read(dev, SFS_BLKN_SUPER, sfs_buffer)) != 0) {
         goto failed_cleanup_sfs_buffer;
     }
 
     ret = -E_INVAL;
 
+    /* 将读入到buffer的内容视为sfs的superblock进行校验 */
     struct sfs_super *super = sfs_buffer;
     if (super->magic != SFS_MAGIC) {
         cprintf("sfs: wrong magic in superblock. (%08x should be %08x).\n",
@@ -188,6 +199,7 @@ sfs_do_mount(struct device *dev, struct fs **fs_store) {
                 super->blocks, dev->d_blocks);
         goto failed_cleanup_sfs_buffer;
     }
+    /* 校验成功, 将buffer中的superblock赋值给sfs_fs的superblock */
     super->info[SFS_MAX_INFO_LEN] = '\0';
     sfs->super = *super;
 
@@ -196,6 +208,7 @@ sfs_do_mount(struct device *dev, struct fs **fs_store) {
     uint32_t i;
 
     /* alloc and initialize hash list */
+    /* 为哈希表分配空间, 并完成初始化 */
     list_entry_t *hash_list;
     if ((sfs->hash_list = hash_list = kmalloc(sizeof(list_entry_t) * SFS_HLIST_SIZE)) == NULL) {
         goto failed_cleanup_sfs_buffer;
@@ -205,16 +218,19 @@ sfs_do_mount(struct device *dev, struct fs **fs_store) {
     }
 
     /* load and check freemap */
+    /* 为freemap分配空间 */
     struct bitmap *freemap;
     uint32_t freemap_size_nbits = sfs_freemap_bits(super);
     if ((sfs->freemap = freemap = bitmap_create(freemap_size_nbits)) == NULL) {
         goto failed_cleanup_hash_list;
     }
+    /* 读块设备的2号块(freemap)到sfs的buffer中 */
     uint32_t freemap_size_nblks = sfs_freemap_blocks(super);
     if ((ret = sfs_init_freemap(dev, freemap, SFS_BLKN_FREEMAP, freemap_size_nblks, sfs_buffer)) != 0) {
         goto failed_cleanup_freemap;
     }
 
+    /* 校验freemap并统计未使用块的数量 */
     uint32_t blocks = sfs->super.blocks, unused_blocks = 0;
     for (i = 0; i < freemap_size_nbits; i ++) {
         if (bitmap_test(freemap, i)) {
@@ -224,6 +240,7 @@ sfs_do_mount(struct device *dev, struct fs **fs_store) {
     assert(unused_blocks == sfs->super.unused_blocks);
 
     /* and other fields */
+    /* 其他部分字段初始化 */
     sfs->super_dirty = 0;
     sem_init(&(sfs->fs_sem), 1);
     sem_init(&(sfs->io_sem), 1);
@@ -233,6 +250,7 @@ sfs_do_mount(struct device *dev, struct fs **fs_store) {
             blocks - unused_blocks, unused_blocks, blocks);
 
     /* link addr of sync/get_root/unmount/cleanup funciton  fs's function pointers*/
+    /* 实现sync/getroot/unmount/cleanup四个函数 */
     fs->fs_sync = sfs_sync;
     fs->fs_get_root = sfs_get_root;
     fs->fs_unmount = sfs_unmount;
@@ -251,6 +269,11 @@ failed_cleanup_fs:
     return ret;
 }
 
+/**
+ * @brief 挂载devname对应设备中的sfs文件系统
+ * 
+ * @param devname 设备名
+ **/
 int
 sfs_mount(const char *devname) {
     return vfs_mount(devname, sfs_do_mount);

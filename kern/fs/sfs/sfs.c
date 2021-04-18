@@ -8,6 +8,8 @@
  *
  * CALL GRAPH:
  *   kern_init-->fs_init-->sfs_init
+ *
+ * 挂载disk0中的sfs文件系统
  */
 void
 sfs_init(void) {

@@ -122,12 +122,13 @@ fd_array_release(struct file *file) {
     }
 }
 
+
+// fd_array_open - file's open_count++, set status to FD_OPENED
 /**
  * 打开文件
  * file->open_count++
  * file->status = FD_OPENED;
  */ 
-// fd_array_open - file's open_count++, set status to FD_OPENED
 void
 fd_array_open(struct file *file) {
     assert(file->status == FD_INIT && file->node != NULL);
@@ -135,12 +136,13 @@ fd_array_open(struct file *file) {
     fopen_count_inc(file);
 }
 
+
+// fd_array_close - file's open_count--; if file's open_count-- == 0 , then call fd_array_free to free this file item
 /**
  * 关闭一个文件
  * 如果此文件的全局文件打开表为0
  * 则释放此文件的内存空间
  */ 
-// fd_array_close - file's open_count--; if file's open_count-- == 0 , then call fd_array_free to free this file item
 void
 fd_array_close(struct file *file) {
     assert(file->status == FD_OPENED);

@@ -32,17 +32,30 @@ struct iobuf;   // kernel or userspace I/O buffer (iobuf.h)
  * filesystem should have been discarded/released.
  *
  */
+
+/**
+ * @brief 抽象文件系统(设备可作为文件访问)
+ * 信息：
+ *      fs_info   : 具体的文件系统信息(目前只有sfs)
+ *      fs_type   : 文件系统类型(目前只有sfs)
+ * 操作: //TODO
+ *
+ *      fs_sync       - Flush all dirty buffers to disk.
+ *      fs_get_root   - Return root inode of filesystem.
+ *      fs_unmount    - Attempt unmount of filesystem.
+ *      fs_cleanup    - Cleanup of filesystem.???      
+ */
 struct fs {
     union {
         struct sfs_fs __sfs_info;                   
-    } fs_info;                                     // filesystem-specific data 
+    } fs_info;                                     // 具体文件系统信息
     enum {
         fs_type_sfs_info,
-    } fs_type;                                     // filesystem type 
-    int (*fs_sync)(struct fs *fs);                 // Flush all dirty buffers to disk 
-    struct inode *(*fs_get_root)(struct fs *fs);   // Return root inode of filesystem.
-    int (*fs_unmount)(struct fs *fs);              // Attempt unmount of filesystem.
-    void (*fs_cleanup)(struct fs *fs);             // Cleanup of filesystem.???
+    } fs_type;                                     // 文件系统类型
+    int (*fs_sync)(struct fs *fs);                 // 将文件系统所有buffer可持久化到磁盘接口
+    struct inode *(*fs_get_root)(struct fs *fs);   // 返回当前文件系统根目录接口
+    int (*fs_unmount)(struct fs *fs);              // 尝试卸载文件系统接口
+    void (*fs_cleanup)(struct fs *fs);             // 清除文件系统
 };
 
 #define __fs_type(type)                                             fs_type_##type##_info
@@ -113,8 +126,8 @@ const char *vfs_get_devname(struct fs *fs);
  *    vfs_getcwd - Retrieve name of current directory of current thread.
  *
  */
-int vfs_open(char *path, uint32_t open_flags, struct inode **inode_store);
 int vfs_close(struct inode *node);
+int vfs_open(char *path, uint32_t open_flags, struct inode **inode_store);
 int vfs_link(char *old_path, char *new_path);
 int vfs_symlink(char *old_path, char *new_path);
 int vfs_readlink(char *path, struct iobuf *iob);

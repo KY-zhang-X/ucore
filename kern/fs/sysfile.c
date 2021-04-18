@@ -206,6 +206,7 @@ sysfile_chdir(const char *__path) {
 }
 
 /* sysfile_link - link file */
+/* unimplement */
 int
 sysfile_link(const char *__path1, const char *__path2) {
     int ret;
@@ -223,6 +224,7 @@ sysfile_link(const char *__path1, const char *__path2) {
 }
 
 /* sysfile_rename - rename file */
+/* unimplement */
 int
 sysfile_rename(const char *__path1, const char *__path2) {
     int ret;

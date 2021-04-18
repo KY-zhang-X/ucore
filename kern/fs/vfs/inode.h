@@ -159,6 +159,8 @@ void inode_kill(struct inode *node);
  *                      of the file and copy to the specified io buffer. 
  *                      Need not work on objects that are not
  *                      directories.
+ *                      计算相对于文件文件系统根目录的路径名，并将其复制到指定的io缓冲区。
+ *                      不需要在不是目录的对象上工作。
  *
  *****************************************
  *
@@ -242,12 +244,23 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_open_inc(node)                                          inode_open_inc(node)
 #define vop_open_dec(node)                                          inode_open_dec(node)
 
-
+/**
+ * @brief 返回当前inode引用计数node->ref_count
+ * 
+ * @param node 
+ * @return int 
+ */
 static inline int
 inode_ref_count(struct inode *node) {
     return node->ref_count;
 }
 
+/**
+ * @brief 返回打开此inode对应文件个数node->open_count
+ * 
+ * @param node 
+ * @return int 
+ */
 static inline int
 inode_open_count(struct inode *node) {
     return node->open_count;

@@ -10,6 +10,8 @@
 
 /* *
  * __alloc_inode - alloc a inode structure and initialize in_type
+ * 为inode动态分配内存, 并设定inode的type
+ * TODO: 由于传了type的参数, 是否可以针对不同类型的文件系统, 为inode分配不同大小的内存(不使用union的方式)
  * */
 
 /**
@@ -30,6 +32,14 @@ __alloc_inode(int type) {
 /* *
  * inode_init - initialize a inode structure
  * invoked by vop_init
+ * 初始化一个inode的结构体
+ * 除了与类型有关的域, 所有的域都会被初始化
+ * 
+ * ref_count: 引用计数
+ * open_count: 打开计数
+ * in_ops: VFS抽象接口
+ * in_fs: 指向该inode归属的文件系统
+ * //TODO: 引用计数的含义, 以及最后引用加一的意思
  * */
 
 /**

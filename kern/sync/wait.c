@@ -94,6 +94,13 @@ wakeup_first(wait_queue_t *queue, uint32_t wakeup_flags, bool del) {
     }
 }
 
+/**
+ * @brief 唤醒等待队列中所有的进程
+ * 
+ * @param queue         等待队列
+ * @param wakeup_flags  唤醒标志, 恢复之后由进程自己检查该标志
+ * @param del           是否删除
+ **/
 void
 wakeup_queue(wait_queue_t *queue, uint32_t wakeup_flags, bool del) {
     wait_t *wait;

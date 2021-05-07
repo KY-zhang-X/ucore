@@ -10,12 +10,13 @@
 #define MFS_BLKSIZE         1024
 #define MFS_NDIRECT         7
 #define MFS_MAX_FNAME_LEN   13
+#define MFS_BLKN_SUPER      1
 
 /* 1逻辑块中的bits数 */
 #define MFS_BLKBITS         (MFS_BLKSIZE * CHAR_BIT)
 
 /* 1逻辑块中的项目数 */
-// #define MFS_BLK_NENTRY                              (MFS_BLKSIZE / sizeof(uint16_t))
+// #define MFS_BLK_NENTRY                              (MFS_BLKSIZE / sizeof(uint32_t))
 
 /* 文件类型 */
 #define MFS_TYPE_FIFO   1       // FIFO文件
@@ -28,29 +29,29 @@
  * 磁盘上的超级块(SuperBlock)
  **/
 struct mfs_super {
-    uint16_t s_ninodes;         // inode数目
-    uint16_t s_nzones;          // 逻辑块数
-    uint16_t s_imap_blocks;     // inode位图所占块数
-    uint16_t s_zmap_blocks;     // 逻辑块位图所占块数
-    uint16_t s_firstdatazone;   // 数据区中第一个逻辑块块号
-    uint16_t s_log_zone_size;   // Log2(磁盘块数/逻辑块数)
-    uint32_t s_max_size;        // 最大文件长度
-    uint16_t s_magic;           // magic number
+    uint16_t ninodes;         // inode数目
+    uint16_t nzones;          // 逻辑块数
+    uint16_t imap_blocks;     // inode位图所占块数
+    uint16_t zmap_blocks;     // 逻辑块位图所占块数
+    uint16_t firstdatazone;   // 数据区中第一个逻辑块块号
+    uint16_t log_zone_size;   // Log2(磁盘块数/逻辑块数)
+    uint32_t max_size;        // 最大文件长度
+    uint16_t magic;           // magic number
 };
 
 /**
  * 磁盘上的inode
  **/
 struct mfs_disk_inode {
-    uint16_t i_mode;                // 文件的类型和属性(rwx), 这里只用到类型字段
-    uint16_t i_uid;                 // 文件所有者的用户id, 不使用
-    uint32_t i_size;                // 文件长度(字节)
-    uint32_t i_mtime;               // 最后修改时间(秒)
-    uint8_t  i_gid;                 // 文件所有者的组id, 不使用
-    uint8_t  i_nlinks;              // 硬链接数
-    uint16_t i_direct[MFS_NDIRECT]; // 直接块号
-    uint16_t i_indirect;            // 一级间接块号
-    uint16_t i_db_indirect;         // 二级间接块号
+    uint16_t mode;                // 文件的类型和属性(rwx), 这里只用到类型字段
+    uint16_t uid;                 // 文件所有者的用户id, 不使用
+    uint32_t size;                // 文件长度(字节)
+    uint32_t mtime;               // 最后修改时间(秒)
+    uint8_t  gid;                 // 文件所有者的组id, 不使用
+    uint8_t  nlinks;              // 硬链接数
+    uint16_t direct[MFS_NDIRECT]; // 直接块号
+    uint16_t indirect;            // 一级间接块号
+    uint16_t db_indirect;         // 二级间接块号
 };
 
 /**
@@ -69,15 +70,15 @@ struct mfs_disk_entry {
  **/
 struct mfs_inode {
     struct mfs_disk_inode *din;     // 磁盘上的inode
-    uint32_t i_no;                   // 节点号 (linux-0.11中数据类型是uint16_t)
-    // uint32_t i_atime;               // 最后访问时间
-    // uint32_t i_ctime;               // inode自身被修改时间
-    uint16_t i_count;               // inode被引用的次数
-    uint8_t i_dirty;               // inode已被修改标志
-    uint8_t i_pipe;                // inode用作管道标志
-    semaphore_t i_sem;              // inode信号量
-    list_entry_t i_inode_link;      // mfs_fs中链表的项目
-    list_entry_t i_hash_link;       // mfs_fs中哈希表的项目
+    uint32_t no;                   // 节点号 (linux-0.11中数据类型是uint16_t)
+    // uint32_t atime;               // 最后访问时间
+    // uint32_t ctime;               // inode自身被修改时间
+    uint16_t count;               // inode被引用的次数
+    uint8_t dirty;               // inode已被修改标志
+    uint8_t pipe;                // inode用作管道标志
+    semaphore_t sem;              // inode信号量
+    list_entry_t inode_link;      // mfs_fs中链表的项目
+    list_entry_t hash_link;       // mfs_fs中哈希表的项目
 };
 
 #define le2min(le, member)                  \
@@ -89,8 +90,8 @@ struct mfs_inode {
 struct mfs_fs {
     struct mfs_super super;         // 磁盘上的superblock
     struct device *dev;             // 设备
-    struct bitmap *inodemap;        // inode位图
-    struct bitmap *zonemap;         // 逻辑块位图
+    struct bitmap *inodemap[8];     // inode位图
+    struct bitmap *zonemap[8];      // 逻辑块位图
     struct mfs_inode *isup;         // 该安装文件系统根目录inode
     struct mfs_inode *imount;       // 该文件系统被安装到的inode
     uint8_t super_dirty;            // 已被修改标志
@@ -108,7 +109,22 @@ struct mfs_fs {
 #define MFS_HLIST_SIZE                              (1 << MFS_HLIST_SHIFT)
 #define min_hashfn(x)                               (hash32(x, MFS_HLIST_SHIFT))
 
-/*  */
+/* MFS的操作 */
+void mfs_init(void);                    // 初始化MFS文件系统, 调用mfs_mount函数
+int mfs_mount(const char *devname);     // 挂载devname对应的设备, 将该设备中的文件系统视为mfs进行初始化
 
+void lock_mfs_fs(struct mfs_fs *mfs);
+void lock_mfs_io(struct mfs_fs *mfs);
+void unlock_mfs_fs(struct mfs_fs *mfs);
+void unlock_mfs_io(struct mfs_fs *mfs);
+
+int mfs_rblock(struct mfs_fs *mfs, void *buf, uint32_t blkno, uint32_t nblks);
+int mfs_wblock(struct mfs_fs *mfs, void *buf, uint32_t blkno, uint32_t nblks);
+int mfs_rbuf(struct mfs_fs *mfs, void *buf, size_t len, uint32_t blkno, off_t offset);
+int mfs_wbuf(struct mfs_fs *mfs, void *buf, size_t len, uint32_t blkno, off_t offset);
+int mfs_sync_super(struct mfs_fs *mfs);
+int mfs_clear_block(struct mfs_fs *mfs, uint32_t blkno, uint32_t nblks);
+
+int mfs_load_inode(struct mfs_fs *mfs, struct inode **node_store, uint32_t ino);
 
 #endif /* !__KERN_FS_MFS_H__ */

@@ -51,7 +51,7 @@ bitmap_create(uint32_t nbits) {
 }
 
 // bitmap_alloc - locate a cleared bit, set it, and return its index.
-// 找到第一个值为0的位, 置为1并返回
+// 找到第一个值为1的位, 置为0并返回
 int
 bitmap_alloc(struct bitmap *bitmap, uint32_t *index_store) {
     WORD_TYPE *map = bitmap->map;
@@ -83,7 +83,7 @@ bitmap_translate(struct bitmap *bitmap, uint32_t index, WORD_TYPE **word, WORD_T
 }
 
 // bitmap_test - according index, get the related value (0 OR 1) in the bitmap
-// 根据下标, 直接得到位的信息(0或1)
+// 根据下标, 直接得到位的信息(0或1), 1表示空闲, 0表示占用
 // 调用bitmap_translate
 bool
 bitmap_test(struct bitmap *bitmap, uint32_t index) {
@@ -93,7 +93,7 @@ bitmap_test(struct bitmap *bitmap, uint32_t index) {
 }
 
 // bitmap_free - according index, set related bit to 1
-// 在位图中释放一个位(将1置为0)
+// 在位图中释放一个位(将0置为1)
 void
 bitmap_free(struct bitmap *bitmap, uint32_t index) {
     WORD_TYPE *word, mask;

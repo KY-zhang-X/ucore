@@ -7,7 +7,6 @@
 #include <error.h>
 
 /*
- * dev_open - Called for each open().
  * 设备打开函数, 检查四个标志, 并调用struct device中的d_open函数
  * 
  * O_CREAT: 如果文件不存在就创建文件
@@ -25,7 +24,6 @@ dev_open(struct inode *node, uint32_t open_flags) {
 }
 
 /*
- * dev_close - Called on the last close(). Just pass through.
  * 设备关闭函数, 调用struct device的d_close函数
  */
 static int
@@ -35,7 +33,6 @@ dev_close(struct inode *node) {
 }
 
 /*
- * dev_read -Called for read. Hand off to iobuf.
  * 设备读函数, 调用struct device的d_io函数(参数write=0)
  */
 static int
@@ -45,7 +42,6 @@ dev_read(struct inode *node, struct iobuf *iob) {
 }
 
 /*
- * dev_write -Called for write. Hand off to iobuf.
  * 设备写函数, 调用struct device的d_io函数(参数write=1)
  */
 static int
@@ -55,7 +51,6 @@ dev_write(struct inode *node, struct iobuf *iob) {
 }
 
 /*
- * dev_ioctl - Called for ioctl(). Just pass through.
  * 设备io控制函数, 调用struct device的d_ioctl函数
  */
 static int
@@ -65,9 +60,6 @@ dev_ioctl(struct inode *node, int op, void *data) {
 }
 
 /*
- * dev_fstat - Called for stat().
- *             Set the type and the size (block devices only).
- *             The link count for a device is always 1.
  * 获取设备信息函数, 将信息放到stat结构体中
  * 
  * struct stat中有四个参数:
@@ -92,9 +84,6 @@ dev_fstat(struct inode *node, struct stat *stat) {
 }
 
 /*
- * dev_gettype - Return the type. A device is a "block device" if it has a known
- *               length. A device that generates data in a stream is a "character
- *               device".
  * 获取设备类型函数, 根据struct device的d_blocks字段, 确定设备类型是S_IFBLK(块设备)还是S_IFCHR(字符设备)
  */
 static int
@@ -105,9 +94,6 @@ dev_gettype(struct inode *node, uint32_t *type_store) {
 }
 
 /*
- * dev_tryseek - Attempt a seek.
- *               For block devices, require block alignment.
- *               For character devices, prohibit seeking entirely.
  * 检查一个偏移量pos是否在设备缓冲区允许的范围内
  */
 static int
@@ -149,7 +135,6 @@ dev_lookup(struct inode *node, char *path, struct inode **node_store) {
 }
 
 /*
- * Function table for device inodes.
  * 实现设备文件系统在VFS中的接口
  */
 static const struct inode_ops dev_node_ops = {
@@ -171,7 +156,6 @@ static const struct inode_ops dev_node_ops = {
         dev_init_##x();                                 \
     } while (0)
 
-/* dev_init - Initialization functions for builtin vfs-level devices. */
 /* 完成VFS层面的设备初始化 */
 void
 dev_init(void) {
@@ -180,7 +164,6 @@ dev_init(void) {
     init_device(stdout);
     init_device(disk0);
 }
-/* dev_create_inode - Create inode for a vfs-level device. */
 /* 为设备创建一个inode */
 struct inode *
 dev_create_inode(void) {

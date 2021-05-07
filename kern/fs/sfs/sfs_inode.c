@@ -88,6 +88,22 @@ sfs_block_inuse(struct sfs_fs *sfs, uint32_t ino) {
     panic("sfs_block_inuse: called out of range (0, %u) %u.\n", sfs->super.blocks, ino);
 }
 
+static int sfs_super_sync(struct sfs_fs *sfs)
+{
+    int ret;
+    if (sfs->super_dirty) {
+        sfs->super_dirty = 0;
+        if ((ret = sfs_sync_super(sfs)) != 0) {
+            sfs->super_dirty = 1;
+            return ret;
+        }
+        if ((ret = sfs_sync_freemap(sfs)) != 0) {
+            sfs->super_dirty = 1;
+            return ret;
+        }
+    }
+}
+
 /*
  * sfs_block_alloc -  check and get a free disk block
  * 分配一个空闲块, 可用于inode或数据
@@ -100,6 +116,7 @@ sfs_block_alloc(struct sfs_fs *sfs, uint32_t *ino_store) {
     }
     assert(sfs->super.unused_blocks > 0);
     sfs->super.unused_blocks --, sfs->super_dirty = 1;
+    sfs_super_sync(sfs);
     assert(sfs_block_inuse(sfs, *ino_store));
     return sfs_clear_block(sfs, *ino_store, 1);
 }
@@ -113,10 +130,14 @@ sfs_block_free(struct sfs_fs *sfs, uint32_t ino) {
     assert(sfs_block_inuse(sfs, ino));
     bitmap_free(sfs->freemap, ino);
     sfs->super.unused_blocks ++, sfs->super_dirty = 1;
+    sfs_super_sync(sfs);
 }
 
 /*
  * sfs_create_inode - alloc a inode in memroy, and init din/ino/dirty/reclian_count/sem fields in sfs_inode in inode
+ * 得到了磁盘上的inode和inode号, 在内存中为inode申请空间, 并且完成初始化
+ * dirty位置为0, reclaim_count置为1
+ * 初始化inode锁定信号量
  */
 static int
 sfs_create_inode(struct sfs_fs *sfs, struct sfs_disk_inode *din, uint32_t ino, struct inode **node_store) {
@@ -136,6 +157,8 @@ sfs_create_inode(struct sfs_fs *sfs, struct sfs_disk_inode *din, uint32_t ino, s
  * lookup_sfs_nolock - according ino, find related inode
  *
  * NOTICE: le2sin, info2node MACRO
+ * 根据inode号, 在内存中找到相关的inode
+ * inode引用次数+1, 如果此时引用次数为1(即刚才inode引用次数为0), reclaim_count(再引用次数)+1
  */
 static struct inode *
 lookup_sfs_nolock(struct sfs_fs *sfs, uint32_t ino) {
@@ -157,6 +180,11 @@ lookup_sfs_nolock(struct sfs_fs *sfs, uint32_t ino) {
 /*
  * sfs_load_inode - If the inode isn't existed, load inode related ino disk block data into a new created inode.
  *                  If the inode is in memory alreadily, then do nothing
+ * 根据inode号, 从磁盘中将inode载入到内存中
+ * - 如果inode已存在, 就直接返回对应的inode
+ * - 如果inode不存在, 首先在内存中创建disk_inode的空间, 然后从磁盘读disk_inode, 最后创建inode并加入链表中
+ * 调用sfs_create_inode创建inode
+ * 使用sfs结构体中的fs锁
  */
 int
 sfs_load_inode(struct sfs_fs *sfs, struct inode **node_store, uint32_t ino) {
@@ -204,6 +232,12 @@ failed_unlock:
  * @create:   BOOL, if the block isn't allocated, if create = 1 the alloc a block,  otherwise just do nothing
  * @ino_store: 0 OR the index of already inused block or new allocated block.
  */
+/**
+ * 根据索引块磁盘块号entp和索引值index找到对应的索引项(即数据块号)
+ * 如果create为1, 则
+ * - 当索引块不存在时, 建立该索引块
+ * - 当对应的索引项未分配索引块时, 分配一个索引块
+ **/
 static int
 sfs_bmap_get_sub_nolock(struct sfs_fs *sfs, uint32_t *entp, uint32_t index, bool create, uint32_t *ino_store) {
     assert(index < SFS_BLK_NENTRY);
@@ -260,6 +294,12 @@ failed_cleanup:
  * @create:   BOOL, if the block isn't allocated, if create = 1 the alloc a block,  otherwise just do nothing
  * @ino_store: 0 OR the index of already inused block or new allocated block.
  */
+/**
+ * 从inode中根据index得到对应的块号
+ * - 对于直接块来说, 得到的块号直接存储在din->direct[index]中
+ * - 对于间接块来说, 需要从对应的索引块找到块号
+ * (该函数主要处理间接块和直接块的差异)
+ **/
 static int
 sfs_bmap_get_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t index, bool create, uint32_t *ino_store) {
     struct sfs_disk_inode *din = sin->din;
@@ -300,6 +340,7 @@ out:
 
 /*
  * sfs_bmap_free_sub_nolock - set the entry item to 0 (free) in the indirect block
+ * 将索引块中的对应索引项置为0, 并释放对应的块
  */
 static int
 sfs_bmap_free_sub_nolock(struct sfs_fs *sfs, uint32_t ent, uint32_t index) {
@@ -321,6 +362,8 @@ sfs_bmap_free_sub_nolock(struct sfs_fs *sfs, uint32_t ent, uint32_t index) {
 
 /*
  * sfs_bmap_free_nolock - free a block with logical index in inode and reset the inode's fields
+ * 释放inode中对应index的块
+ * 同sfs_bmap_get_nolock函数的作用, 处理直接块和间接块的差异
  */
 static int
 sfs_bmap_free_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t index) {
@@ -356,6 +399,7 @@ sfs_bmap_free_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t index) 
  * @sin:      sfs inode in memory
  * @index:    the logical index of disk block in inode
  * @ino_store:the NO. of disk block
+ * 从inode中根据index得到对应的块号, 如果index为该文件的未分配的下一个数据块, 就创建该数据块
  */
 static int
 sfs_bmap_load_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t index, uint32_t *ino_store) {
@@ -379,6 +423,7 @@ sfs_bmap_load_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t index, 
 
 /*
  * sfs_bmap_truncate_nolock - free the disk block at the end of file
+ * 释放inode中的最后一个数据块
  */
 static int
 sfs_bmap_truncate_nolock(struct sfs_fs *sfs, struct sfs_inode *sin) {
@@ -399,6 +444,8 @@ sfs_bmap_truncate_nolock(struct sfs_fs *sfs, struct sfs_inode *sin) {
  * @sin:      sfs inode in memory
  * @slot:     the index of file entry
  * @entry:    file entry
+ * 从目录inode中根据slot读入找到对应的块, 再从块中读取第一个目录项放到entry对应的地址
+ * TODO: 每个块只存放一个目录项?
  */
 static int
 sfs_dirent_read_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, struct sfs_disk_entry *entry) {
@@ -416,6 +463,96 @@ sfs_dirent_read_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, stru
     }
     entry->name[SFS_MAX_FNAME_LEN] = '\0';
     return 0;
+}
+
+/**
+ * sfs_dirent_link_nolock - 将目录项链接到一个inode上
+ * @sfs: sfs文件系统
+ * @sin: 父目录的inode
+ * @slot: 目录项在父目录中的索引值
+ * @lnksin: 被链接的inode
+ * @name: 目录项中的名字
+ */
+static int sfs_dirent_link_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, struct sfs_inode *lnksin, const char *name) 
+{
+    int ret;
+    uint32_t ino;
+    // 找到slot对应目录项的ino, 注意该目录项应该为空
+    if ((ret = sfs_bmap_load_nolock(sfs, sin, slot, &ino)) != 0) {
+        return ret;
+    }
+    cprintf("newlink ino: %x\n", ino);
+    assert(sfs_block_inuse(sfs, ino));
+    // 写新目录项到ino对应的块
+    if ((ret = sfs_clear_block(sfs, ino, 1)) != 0) {
+        return ret;
+    }
+    struct sfs_disk_entry *entry;
+    if ((entry = kmalloc(sizeof(struct sfs_disk_entry))) == NULL) {
+        return -E_NO_MEM;
+    }
+    memset(entry, 0, sizeof(struct sfs_disk_entry));
+    entry->ino = lnksin->ino;
+    strncpy(entry->name, name, SFS_MAX_FNAME_LEN);
+    if ((ret = sfs_wbuf(sfs, entry, sizeof(struct sfs_disk_entry), ino, 0)) != 0) {
+        kfree(entry);
+        return ret;
+    }
+    // 更新被链接inode的链接数
+    lnksin->dirty = 1;
+    lnksin->din->nlinks ++;
+    sin->dirty = 1;
+    kfree(entry);
+    return 0;
+}
+
+/**
+ * sfs_dirent_unlink_nolock - 取消一个目录项到一个inode的链接, 如果没有目录项链接到该文件, 就删除该文件
+ * @sfs: sfs文件系统
+ * @sin: 父目录的inode
+ * @slot: 目录项在父目录中的索引值
+ * @lnksin: 被链接的文件的inode
+ */
+static int sfs_dirent_unlink_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, struct sfs_inode *lnksin)
+{
+    int ret;
+    uint32_t ino;
+    struct sfs_disk_inode *din = sin->din;
+    struct sfs_disk_inode *lnkdin = lnksin->din;
+    
+    // 读该目录项的块号
+    if ((ret = sfs_bmap_get_nolock(sfs, sin, slot, 0, &ino)) != 0) {
+        return ret;
+    }
+    // 读该目录项的内容
+    ret = -E_NO_MEM;
+    struct sfs_disk_entry *entry;
+    if ((entry = kmalloc(sizeof(struct sfs_disk_entry))) == NULL)
+        return -E_NO_MEM;
+    if ((ret = sfs_rbuf(sfs, &entry, sizeof(struct sfs_disk_entry), ino, 0)) != 0) {
+        goto failed_cleanup;
+    }
+    // 检查目录项是否为..和.
+    if (strncmp(entry->name, "..", SFS_MAX_FNAME_LEN) == 0 || strncmp(entry->name, ".", SFS_MAX_FNAME_LEN) == 0) {
+        goto failed_cleanup;
+    }
+    // 检查目录项指向的inode与目标inode是否相同
+    if (entry->ino != lnksin->ino)
+        goto failed_cleanup;
+    // 释放目录项
+    sfs_bmap_free_nolock(sfs, sin, slot);
+    lnkdin->nlinks --;
+    // 如果是被链接的文件是目录文件, 父目录的硬链接数减1(".."目录项)
+    if(S_ISDIR(lnkdin->type)) {
+        din->nlinks --;
+    }
+
+    kfree(entry);
+    return 0;
+
+failed_cleanup:
+    kfree(entry);
+    return ret;
 }
 
 #define sfs_dirent_link_nolock_check(sfs, sin, slot, lnksin, name)                  \
@@ -443,6 +580,8 @@ sfs_dirent_read_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, stru
  * @ino_store:  NO. of disk of this file (with the filename)'s inode
  * @slot:       logical index of file entry (NOTICE: each file entry ocupied one  disk block)
  * @empty_slot: the empty logical index of file entry.
+ * 读取目录inode中的每一个块的目录项并检查与目标文件名是否匹配
+ * 对应的块索引存储在slot内, 对应文件的inode块号存储在ino_store中, empty_slot中存储最后一个无效目录项的索引号
  */
 static int
 sfs_dirent_search_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, const char *name, uint32_t *ino_store, int *slot, int *empty_slot) {
@@ -478,8 +617,9 @@ out:
 
 /*
  * sfs_dirent_findino_nolock - read all file entries in DIR's inode and find a entry->ino == ino
+ * 读取目录inode每一个块的目录项并检查与目标块号是否匹配
+ * 存在匹配则返回0
  */
-
 static int
 sfs_dirent_findino_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t ino, struct sfs_disk_entry *entry) {
     int ret, i, nslots = sin->din->blocks;
@@ -501,6 +641,7 @@ sfs_dirent_findino_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, uint32_t in
  * @name:       the file name in DIR
  * @node_store: the inode corresponding the file name in DIR
  * @slot:       the logical index of file entry
+ * 根据名字查找到目录下对应的文件, 将对应文件的inode存储在node_store中,对应在目录inode中的块索引号存储在slot中
  */
 static int
 sfs_lookup_once(struct sfs_fs *sfs, struct sfs_inode *sin, const char *name, struct inode **node_store, int *slot) {
@@ -547,6 +688,17 @@ sfs_close(struct inode *node) {
     return vop_fsync(node);
 }
 
+static int sfs_link(struct inode *node, const char *name, struct inode *link_node) 
+{
+    
+}
+
+static int sfs_unlink(struct inode *node, const char *name)
+{
+    
+    
+}
+
 /*  
  * sfs_io_nolock - Rd/Wr a file contentfrom offset position to offset+ length  disk blocks<-->buffer (in memroy)
  * @sfs:      sfs file system
@@ -555,6 +707,7 @@ sfs_close(struct inode *node) {
  * @offset:   the offset of file
  * @alenp:    the length need to read (is a pointer). and will RETURN the really Rd/Wr lenght
  * @write:    BOOL, 0 read, 1 write
+ * 完成inode数据块和buf之间的数据交换, 读写起点为offset, 读写长度存放在alenp中
  */
 static int
 sfs_io_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, void *buf, off_t offset, size_t *alenp, bool write) {
@@ -596,16 +749,6 @@ sfs_io_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, void *buf, off_t offset
     uint32_t blkno = offset / SFS_BLKSIZE;          // The NO. of Rd/Wr begin block
     uint32_t nblks = endpos / SFS_BLKSIZE - blkno;  // The size of Rd/Wr blocks
 
-  //LAB8:EXERCISE1 YOUR CODE HINT: call sfs_bmap_load_nolock, sfs_rbuf, sfs_rblock,etc. read different kind of blocks in file
-	/*
-	 * (1) If offset isn't aligned with the first block, Rd/Wr some content from offset to the end of the first block
-	 *       NOTICE: useful function: sfs_bmap_load_nolock, sfs_buf_op
-	 *               Rd/Wr size = (nblks != 0) ? (SFS_BLKSIZE - blkoff) : (endpos - offset)
-	 * (2) Rd/Wr aligned blocks 
-	 *       NOTICE: useful function: sfs_bmap_load_nolock, sfs_block_op
-     * (3) If end position isn't aligned with the last block, Rd/Wr some content from begin to the (endpos % SFS_BLKSIZE) of the last block
-	 *       NOTICE: useful function: sfs_bmap_load_nolock, sfs_buf_op	
-	*/
     if ((blkoff = offset % SFS_BLKSIZE) != 0) {
         size = (nblks != 0) ? (SFS_BLKSIZE - blkoff) : (endpos - offset);
         if ((ret = sfs_bmap_load_nolock(sfs, sin, blkno, &ino)) != 0) {
@@ -653,6 +796,7 @@ out:
 /*
  * sfs_io - Rd/Wr file. the wrapper of sfs_io_nolock
             with lock protect
+ * sfs_io_nolock函数的加锁版本, 读写成功会移动iobuf的指针
  */
 static inline int
 sfs_io(struct inode *node, struct iobuf *iob, bool write) {
@@ -672,12 +816,14 @@ sfs_io(struct inode *node, struct iobuf *iob, bool write) {
 }
 
 // sfs_read - read file
+/* 调用sfs_io进行读操作 */
 static int
 sfs_read(struct inode *node, struct iobuf *iob) {
     return sfs_io(node, iob, 0);
 }
 
 // sfs_write - write file
+/* 调用sfs_io进行写操作 */
 static int
 sfs_write(struct inode *node, struct iobuf *iob) {
     return sfs_io(node, iob, 1);
@@ -685,6 +831,7 @@ sfs_write(struct inode *node, struct iobuf *iob) {
 
 /*
  * sfs_fstat - Return nlinks/block/size, etc. info about a file. The pointer is a pointer to struct stat;
+ * 得到文件的块数, 硬链接数, 大小
  */
 static int
 sfs_fstat(struct inode *node, struct stat *stat) {
@@ -702,6 +849,7 @@ sfs_fstat(struct inode *node, struct stat *stat) {
 
 /*
  * sfs_fsync - Force any dirty inode info associated with this file to stable storage.
+ * 强制将内存中的一个块同步到磁盘中
  */
 static int
 sfs_fsync(struct inode *node) {
@@ -725,7 +873,7 @@ sfs_fsync(struct inode *node) {
 
 /*
  *sfs_namefile -Compute pathname relative to filesystem root of the file and copy to the specified io buffer.
- *  
+ * 
  */
 static int
 sfs_namefile(struct inode *node, struct iobuf *iob) {
@@ -743,6 +891,7 @@ sfs_namefile(struct inode *node, struct iobuf *iob) {
     vop_ref_inc(node);
     while (1) {
         struct inode *parent;
+        /* 找到当前目录inode的上层目录inode */
         if ((ret = sfs_lookup_once(sfs, sin, "..", &parent, NULL)) != 0) {
             goto failed;
         }
@@ -750,6 +899,7 @@ sfs_namefile(struct inode *node, struct iobuf *iob) {
         uint32_t ino = sin->ino;
         vop_ref_dec(node);
         if (node == parent) {
+            // 当前节点和父目录节点相同, 证明已到达根目录
             vop_ref_dec(node);
             break;
         }
@@ -759,6 +909,7 @@ sfs_namefile(struct inode *node, struct iobuf *iob) {
 
         lock_sin(sin);
         {
+            // 此时ino的值为当前目录的inode的块号, sin为父目录的inode, 直接根据ino在父目录中查找得到该项对应的目录项, 就是当前目录的目录项
             ret = sfs_dirent_findino_nolock(sfs, sin, ino, entry);
         }
         unlock_sin(sin);
@@ -791,6 +942,9 @@ failed:
 
 /*
  * sfs_getdirentry_sub_noblock - get the content of file entry in DIR
+ * 依次读文件中的每一个有效目录项, 直到找到对应slot的目录项
+ * slot实际上是有效目录项的索引号, 因为无效目录项(ino==0)都被略过了
+ * 和之前的slot含义不同? 之前的slot似乎是inode中的索引号
  */
 static int
 sfs_getdirentry_sub_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, struct sfs_disk_entry *entry) {
@@ -812,6 +966,9 @@ sfs_getdirentry_sub_nolock(struct sfs_fs *sfs, struct sfs_inode *sin, int slot, 
 /*
  * sfs_getdirentry - according to the iob->io_offset, calculate the dir entry's slot in disk block,
                      get dir entry content from the disk 
+ * 根据iobuf的偏移量, 计算出目录项的slot, 然后得到目录项的内容(文件名)并写入iobuf
+ * iobuf的偏移量指的是按照目录项中文件名的长度紧密排列的值?
+ * 调用了sfs_getdirentry_sub_nolock, 因此slot应该也是排除了无效目录项的索引值
  */
 static int
 sfs_getdirentry(struct inode *node, struct iobuf *iob) {
@@ -847,6 +1004,7 @@ out:
 
 /*
  * sfs_reclaim - Free all resources inode occupied . Called when inode is no longer in use. 
+ * 释放该inode占据的所有资源, 表示这个inode不再被使用
  */
 static int
 sfs_reclaim(struct inode *node) {
@@ -890,6 +1048,7 @@ failed_unlock:
 
 /*
  * sfs_gettype - Return type of file. The values for file types are in sfs.h.
+ * 返回文件的类型
  */
 static int
 sfs_gettype(struct inode *node, uint32_t *type_store) {
@@ -910,6 +1069,7 @@ sfs_gettype(struct inode *node, uint32_t *type_store) {
 
 /* 
  * sfs_tryseek - Check if seeking to the specified position within the file is legal.
+ * 检查文件中的一个特定位置是否合法
  */
 static int
 sfs_tryseek(struct inode *node, off_t pos) {
@@ -925,6 +1085,7 @@ sfs_tryseek(struct inode *node, off_t pos) {
 
 /*
  * sfs_truncfile : reszie the file with new length
+ * 重新调整文件大小
  */
 static int
 sfs_truncfile(struct inode *node, off_t len) {
@@ -999,6 +1160,146 @@ sfs_lookup(struct inode *node, char *path, struct inode **node_store) {
     return 0;
 }
 
+/**
+ * 类似于sfs_load_inode, 创建文件inode
+ */
+static int sfs_create_sub_nolock(struct sfs_fs *sfs, struct inode **node_store, uint32_t ino, uint32_t type)
+{
+    int ret = -E_NO_MEM;
+    struct sfs_disk_inode *din;
+    if ((din = kmalloc(sizeof(struct sfs_disk_inode))) == NULL)
+        return -E_NO_MEM;
+
+    if ((ret = sfs_rbuf(sfs, din, sizeof(struct sfs_disk_inode), ino, 0)) != 0) {
+        goto failed_cleanup;
+    }
+
+    din->blocks = 0;
+    din->size = 0;
+    din->type = type;
+    din->nlinks = 0;
+
+    if ((ret = sfs_create_inode(sfs, din, ino, node_store)) != 0) {
+        goto failed_cleanup;
+    }
+
+    struct sfs_inode *sin = vop_info(*node_store, sfs_inode);
+    sin->dirty = 1;
+    sfs_set_links(sfs, sin);
+
+    return 0;
+
+failed_cleanup:
+    kfree(din);
+    return ret;
+}
+
+int sfs_create(struct inode *node, const char *name, bool excl, struct inode **node_store)
+{
+    struct sfs_fs *sfs = fsop_info(vop_fs(node), sfs);
+    struct sfs_inode *sin = vop_info(node, sfs_inode);
+    int ret;
+    uint32_t ino;
+    /* 如果inode已存在, 
+     * excl为1时, 返回错误
+     * excl为0时, 给出文件的inode */
+    int empty_slot;
+    lock_sin(sin);
+    if ((ret = sfs_dirent_search_nolock(sfs, sin, name, &ino, NULL, &empty_slot)) != -E_NOENT) {
+        if (excl) {
+            ret = -E_EXISTS;
+            goto failed_unlock;
+        }
+        if ((ret = sfs_load_inode(sfs, node_store, ino)) != 0) {
+            goto failed_unlock;
+        }
+        goto out;
+    }
+    // }
+    // unlock_sin(sin);
+
+    /* 如果inode不存在, 创建文件的inode */
+    struct inode *new_node;
+    // 申请磁盘块
+    if ((ret = sfs_block_alloc(sfs, &ino)) != 0) {
+        goto failed_unlock;
+    }
+    assert(sfs_block_inuse(sfs, ino));
+    // lock_sfs_fs(sfs);
+    // lock_sin(sin);
+    // {
+    // 创建inode
+    if ((ret = sfs_create_sub_nolock(sfs, &new_node, ino, SFS_TYPE_FILE)) !=0) {
+        goto failed_unlock;
+    }
+    // 建立目录项和inode之间的链接
+    struct sfs_inode *new_sin = vop_info(new_node, sfs_inode);
+    if ((ret = sfs_dirent_link_nolock(sfs, sin, empty_slot, new_sin, name)) != 0) {
+        goto failed_unlock_cleanup;
+    }
+    // }
+    // unlock_sfs_fs(sfs);
+    // unlock_sin(sin);
+    *node_store = new_node;
+out:
+    unlock_sin(sin);
+    return 0;
+
+failed_unlock_cleanup:
+    // 清理建立的inode
+    // vop_reclaim(new_node);
+    sfs_block_free(sfs, ino);
+failed_unlock:
+    unlock_sin(sin);
+failed:
+    return ret;
+
+}
+
+int sfs_mkdir(struct inode *node, const char *name)
+{
+    struct sfs_fs *sfs = fsop_info(vop_fs(node), sfs);
+    struct sfs_inode *sin = vop_info(node, sfs_inode);
+    int empty_slot;
+    uint32_t ino;
+    int ret;
+    lock_sin(sin);
+    // 查找inode是否存在
+    if ((ret = sfs_dirent_search_nolock(sfs, sin, name, &ino, NULL, &empty_slot)) != -E_NOENT) {
+        return -E_EXISTS;
+    }
+    // 申请磁盘块, 用于inode
+    if ((ret = sfs_block_alloc(sfs, &ino)) != 0) {
+        goto failed_unlock;
+    }
+    // 构造目录文件inode
+    struct inode *new_node;
+    if ((ret = sfs_create_sub_nolock(sfs, &new_node, ino, SFS_TYPE_DIR)) != 0) {
+        goto failed_unlock_cleanup;
+    }
+    // 链接自身到父目录的目录项上
+    struct sfs_inode *new_sin = vop_info(new_node, sfs_inode);
+    if ((ret = sfs_dirent_link_nolock(sfs, sin, empty_slot, new_sin, name)) != 0) {
+        // assert(new_sin->din->nlinks == 0);
+		// assert(inode_ref_count(new_node) == 1
+		//        && inode_open_count(new_node) == 0);
+        goto failed_unlock_cleanup;
+    }
+    // 链接自身到".", 链接父目录到".."
+    sfs_dirent_link_nolock(sfs, new_sin, 0, new_sin, ".");
+    sfs_dirent_link_nolock(sfs, new_sin, 1, sin, "..");
+
+    unlock_sin(sin);
+    return 0;
+
+failed_unlock_cleanup:
+    sfs_block_free(sfs, ino);
+failed_unlock:
+    unlock_sin(sin);
+    return ret;
+} 
+
+
 // The sfs specific DIR operations correspond to the abstract operations on a inode.
 static const struct inode_ops sfs_node_dirops = {
     .vop_magic                      = VOP_MAGIC,
@@ -1007,10 +1308,14 @@ static const struct inode_ops sfs_node_dirops = {
     .vop_fstat                      = sfs_fstat,
     .vop_fsync                      = sfs_fsync,
     .vop_namefile                   = sfs_namefile,
+    .vop_mkdir                      = sfs_mkdir,
+    // .vop_link                       = sfs_link,
     .vop_getdirentry                = sfs_getdirentry,
     .vop_reclaim                    = sfs_reclaim,
     .vop_gettype                    = sfs_gettype,
     .vop_lookup                     = sfs_lookup,
+    .vop_create                     = sfs_create,
+    // .vop_unlink                     = sfs_unlink,
 };
 /// The sfs specific FILE operations correspond to the abstract operations on a inode.
 static const struct inode_ops sfs_node_fileops = {

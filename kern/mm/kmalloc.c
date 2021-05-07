@@ -193,7 +193,7 @@ void check_slab(void) {
 void
 slab_init(void) {
   cprintf("use SLOB allocator\n");
-  check_slab();
+//   check_slab();
 }
 
 inline void 

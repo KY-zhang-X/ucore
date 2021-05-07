@@ -8,8 +8,8 @@
 
 
 // open file in vfs, get/create inode for file with filename path.
-int
-vfs_open(char *path, uint32_t open_flags, struct inode **node_store) {
+int vfs_open(char *path, uint32_t open_flags, struct inode **node_store) 
+{
     bool can_write = 0;
     switch (open_flags & O_ACCMODE) {
     case O_RDONLY:
@@ -66,45 +66,48 @@ vfs_open(char *path, uint32_t open_flags, struct inode **node_store) {
 }
 
 // close file in vfs
-int
-vfs_close(struct inode *node) {
+int vfs_close(struct inode *node) 
+{
     vop_open_dec(node);
     vop_ref_dec(node);
     return 0;
 }
 
 // unimplement
-int
-vfs_unlink(char *path) {
+int vfs_unlink(char *path) {
     return -E_UNIMP;
 }
 
 // unimplement
-int
-vfs_rename(char *old_path, char *new_path) {
+int vfs_rename(char *old_path, char *new_path) {
     return -E_UNIMP;
 }
 
 // unimplement
-int
-vfs_link(char *old_path, char *new_path) {
+int vfs_link(char *old_path, char *new_path) {
     return -E_UNIMP;
 }
 
 // unimplement
-int
-vfs_symlink(char *old_path, char *new_path) {
+int vfs_symlink(char *old_path, char *new_path) {
     return -E_UNIMP;
 }
 
 // unimplement
-int
-vfs_readlink(char *path, struct iobuf *iob) {
+int vfs_readlink(char *path, struct iobuf *iob) {
     return -E_UNIMP;
 }
 
-// unimplement
-int
-vfs_mkdir(char *path){
-    return -E_UNIMP;
+// 使用vop_mkdir实现
+int vfs_mkdir(char *path) 
+{
+    int ret;
+    struct inode *dir;
+    char *name;
+    if ((ret = vfs_lookup_parent(path, &dir, &name)) != 0) {
+        return ret;
+    }
+    ret = vop_mkdir(dir, name);
+    cprintf("\nref_count:%d\n", vop_ref_dec(dir));
+    return ret;
 }

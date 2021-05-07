@@ -303,9 +303,9 @@ pmm_init(void) {
     page_init();
 
     //use pmm->check to verify the correctness of the alloc/free function in a pmm
-    check_alloc_page();
+    // check_alloc_page();
 
-    check_pgdir();
+    // check_pgdir();
 
     static_assert(KERNBASE % PTSIZE == 0 && KERNTOP % PTSIZE == 0);
 
@@ -325,7 +325,7 @@ pmm_init(void) {
 
     //now the basic virtual memory map(see memalyout.h) is established.
     //check the correctness of the basic virtual memory map.
-    check_boot_pgdir();
+    // check_boot_pgdir();
 
     print_pgdir();
     

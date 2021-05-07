@@ -44,3 +44,8 @@ getcwd(char *buffer, size_t len) {
     return sys_getcwd(buffer, len);
 }
 
+int mkdir(const char* path)
+{
+    return sys_mkdir(path);
+}
+

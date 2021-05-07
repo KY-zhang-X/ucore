@@ -205,6 +205,19 @@ sysfile_chdir(const char *__path) {
     return ret;
 }
 
+/* sysfile_mkdir - 创建目录 */
+int sysfile_mkdir(const char *__path) 
+{
+    int ret;
+    char *path;
+    if ((ret = copy_path(&path, __path)) != 0) {
+        return ret;
+    }
+    ret = vfs_mkdir(path);
+    kfree(path);
+    return ret;
+}
+
 /* sysfile_link - link file */
 /* unimplement */
 int

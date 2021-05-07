@@ -50,12 +50,10 @@ disk0_close(struct device *dev) {
  * 在 disk0_io 函数中被调用
  * 
  * 读取从 @blkno 开始的 @nblks 个块到 @disk0_buffer
- * 读取失败会给出panic, 但没有返回值
  * 
  * 块大小为 DISK0_BLKSIZE = PGSIZE = 4096
  * 扇区大小为 SECTSIZE = 512
  * disk0_buffer大小为 DISK0_BUFSIZE = 4 * DISK0_BLKSIZE
- * (是否意味着nblks必须不大于4?)
  **/
 static void
 disk0_read_blks_nolock(uint32_t blkno, uint32_t nblks) {

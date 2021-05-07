@@ -6,10 +6,7 @@
 struct inode;
 struct iobuf;
 
-/*
- * Filesystem-namespace-accessible device.
- * d_io is for both reads and writes; the iobuf will indicates the direction.
- */
+
 /**
  * d_blocks 设备占用的数据块个数
  * d_blocksize 数据块的大小

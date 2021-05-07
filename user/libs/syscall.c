@@ -134,6 +134,26 @@ sys_getcwd(char *buffer, size_t len) {
     return syscall(SYS_getcwd, buffer, len);
 }
 
+int sys_mkdir(const char *path) 
+{
+    return syscall(SYS_mkdir, path);
+}
+
+int sys_link(const char *old_path, const char *new_path) 
+{
+    return syscall(SYS_link, old_path, new_path);
+}
+
+int sys_rename(const char *old_path, const char *new_path)
+{
+    return syscall(SYS_rename, old_path, new_path);
+}
+
+int sys_unlink(const char *path)
+{
+    return syscall(SYS_unlink, path);
+}
+
 int
 sys_getdirentry(int fd, struct dirent *dirent) {
     return syscall(SYS_getdirentry, fd, dirent);

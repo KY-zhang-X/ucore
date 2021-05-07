@@ -185,6 +185,8 @@ struct inode_ops {
     int (*vop_write)(struct inode *node, struct iobuf *iob);
     int (*vop_fstat)(struct inode *node, struct stat *stat);
     int (*vop_fsync)(struct inode *node);
+    int (*vop_mkdir)(struct inode *node, const char *name);
+    int (*vop_link)(struct inode *node, const char *name, struct inode *link_node);
     int (*vop_namefile)(struct inode *node, struct iobuf *iob);
     int (*vop_getdirentry)(struct inode *node, struct iobuf *iob);
     int (*vop_reclaim)(struct inode *node);
@@ -192,6 +194,7 @@ struct inode_ops {
     int (*vop_tryseek)(struct inode *node, off_t pos);
     int (*vop_truncate)(struct inode *node, off_t len);
     int (*vop_create)(struct inode *node, const char *name, bool excl, struct inode **node_store);
+    int (*vop_unlink)(struct inode *node, const char *name);
     int (*vop_lookup)(struct inode *node, char *path, struct inode **node_store);
     int (*vop_ioctl)(struct inode *node, int op, void *data);
 };
@@ -215,6 +218,8 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_write(node, iob)                                        (__vop_op(node, write)(node, iob))
 #define vop_fstat(node, stat)                                       (__vop_op(node, fstat)(node, stat))
 #define vop_fsync(node)                                             (__vop_op(node, fsync)(node))
+#define vop_mkdir(node, name)                                       (__vop_op(node, mkdir)(node, name))
+#define vop_link(node, name, link_node)                             (__vop_op(node, link)(node, name, link_node))
 #define vop_namefile(node, iob)                                     (__vop_op(node, namefile)(node, iob))
 #define vop_getdirentry(node, iob)                                  (__vop_op(node, getdirentry)(node, iob))
 #define vop_reclaim(node)                                           (__vop_op(node, reclaim)(node))
@@ -223,6 +228,7 @@ void inode_check(struct inode *node, const char *opstr);
 #define vop_tryseek(node, pos)                                      (__vop_op(node, tryseek)(node, pos))
 #define vop_truncate(node, len)                                     (__vop_op(node, truncate)(node, len))
 #define vop_create(node, name, excl, node_store)                    (__vop_op(node, create)(node, name, excl, node_store))
+#define vop_unlink(node, name)                                      (__vop_op(node, unlink)(node, name))
 #define vop_lookup(node, path, node_store)                          (__vop_op(node, lookup)(node, path, node_store))
 
 

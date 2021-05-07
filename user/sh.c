@@ -113,6 +113,7 @@ testfile(const char *name) {
     return 0;
 }
 
+#include "stat.h"
 int
 runcmd(char *cmd) {
     static char argv0[BUFSIZE];
@@ -191,6 +192,11 @@ again:
             return -1;
         }
     }
+    // {
+    //     struct stat _stat;
+    //     fstat(1, &_stat);
+    //     cprintf("\nbef mode:%x\n", _stat.st_mode, _stat.st_nlinks);
+    // }
 
 runit:
     if (argc == 0) {

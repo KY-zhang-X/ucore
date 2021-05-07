@@ -79,6 +79,7 @@ sfs_wblock(struct sfs_fs *sfs, void *buf, uint32_t blkno, uint32_t nblks) {
  * @len:    the length need to Rd
  * @blkno:  the NO. of disk block
  * @offset: the offset in the content of disk block
+ * 根据blkno读磁盘块, 将磁盘块中的偏移量为offset长度为len的数据读到buf中
  */
 int
 sfs_rbuf(struct sfs_fs *sfs, void *buf, size_t len, uint32_t blkno, off_t offset) {

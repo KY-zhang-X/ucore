@@ -801,6 +801,7 @@ failed_cleanup:
     return ret;
 }
 
+#include <stat.h>
 // do_execve - call exit_mmap(mm)&put_pgdir(mm) to reclaim memory space of current process
 //           - call load_icode to setup new memory space accroding binary prog.
 int
@@ -835,13 +836,19 @@ do_execve(const char *name, int argc, const char **argv) {
     }
     path = argv[0];
     unlock_mm(mm);
-    files_closeall(current->filesp);
+    // files_closeall(current->filesp);
 
     /* sysfile_open will check the first argument path, thus we have to use a user-space pointer, and argv[0] may be incorrect */    
     int fd;
     if ((ret = fd = sysfile_open(path, O_RDONLY)) < 0) {
         goto execve_exit;
     }
+    // {
+    //     // cprintf("open fd=%d\n", fd);
+    //     struct stat _stat;
+    //     file_fstat(1, &_stat);
+    //     cprintf("\nmode:%x nlinks:%d\n", _stat.st_mode, _stat.st_nlinks);
+    // }
     if (mm != NULL) {
         lcr3(boot_cr3);
         if (mm_count_dec(mm) == 0) {
@@ -855,6 +862,12 @@ do_execve(const char *name, int argc, const char **argv) {
     if ((ret = load_icode(fd, argc, kargv)) != 0) {
         goto execve_exit;
     }
+    // {
+    //     // cprintf("open fd=%d\n", fd);
+    //     struct stat _stat;
+    //     file_fstat(1, &_stat);
+    //     cprintf("\n1mode:%x nlinks:%d\n", _stat.st_mode, _stat.st_nlinks);
+    // }
     put_kargv(argc, kargv);
     set_proc_name(current, local_name);
     return 0;
@@ -1013,7 +1026,7 @@ init_main(void *arg) {
         panic("create user_main failed.\n");
     }
  extern void check_sync(void);
-    check_sync();                // check philosopher sync problem
+    // check_sync();                // check philosopher sync problem
 
     while (do_wait(0, NULL) == 0) {
         schedule();

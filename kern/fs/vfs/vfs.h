@@ -89,6 +89,12 @@ struct fs *__alloc_fs(int type);
  * The VFS layer translates operations on abstract on-disk files or
  * pathnames to operations on specific files on specific filesystems.
  */
+
+/**
+ * 虚拟文件系统的系统函数
+ */
+
+
 void vfs_init(void);
 void vfs_cleanup(void);
 void vfs_devlist_init(void);
@@ -102,6 +108,19 @@ void vfs_devlist_init(void);
  *    vfs_get_curdir   - retrieve inode of current directory of current thread
  *    vfs_get_root     - get root inode for the filesystem named DEVNAME
  *    vfs_get_devname  - get mounted device name for the filesystem passed in
+ */
+
+/**
+ * @brief VFS层底层接口
+ * inode.h中放置了inode的相关操作
+ * fs.h中存放的文件系统和设备的操作
+ */
+
+/**
+ *    vfs_set_curdir   - 改变当前进程所在的目录
+ *    vfs_get_curdir   - 返回当前进程所在目录对应的inode
+ *    vfs_get_root     - get root inode for the filesystem named DEVNAME
+ *    vfs_get_devname  - 得到文件系统对应设备名
  */
 int vfs_set_curdir(struct inode *dir);
 int vfs_get_curdir(struct inode **dir_store);
@@ -126,6 +145,20 @@ const char *vfs_get_devname(struct fs *fs);
  *    vfs_getcwd - Retrieve name of current directory of current thread.
  *
  */
+/**
+ * VFS层对路径操作高层接口
+ * 
+ *    vfs_open         - 打开或者创建一个文件
+ *    vfs_close        - 关闭一个vfs_open打开过的文件，不会失败
+ *    vfs_link         - 创建一个硬链接
+ *    vfs_symlink      - 创建一个符号链接
+ *    vfs_readlink     - 读取一个 符号链接到iob中
+ *    vfs_mkdir        - 创建一个目录
+ *    vfs_unlink       - 删除一个 
+ *    vfs_rename       - 改变文件名称
+ *    vfs_chdir        - 改变当前进程所在目录
+ *    vfs_getcwd       - 返回当前进程所在目录名 
+ */ 
 int vfs_close(struct inode *node);
 int vfs_open(char *path, uint32_t open_flags, struct inode **inode_store);
 int vfs_link(char *old_path, char *new_path);

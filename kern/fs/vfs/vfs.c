@@ -29,7 +29,7 @@ __alloc_fs(int type) {
     return fs;
 }
 
-// vfs_init -  vfs initialize
+// vfs初始化
 void
 vfs_init(void) {
     sem_init(&bootfs_sem, 1);

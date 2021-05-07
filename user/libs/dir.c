@@ -49,3 +49,12 @@ int mkdir(const char* path)
     return sys_mkdir(path);
 }
 
+int link(const char *old_path, const char *new_path) 
+{
+    return sys_link(old_path, new_path);
+}
+
+int unlink(const char *path)
+{
+    return sys_unlink(path);
+}

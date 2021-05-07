@@ -14,7 +14,6 @@ static char buf[BUFSIZE];
 
 int main(int argc, char *argv[])
 {
-    printf("\n");
     // {
     //     struct stat _stat;
     //     fstat(1, &_stat);

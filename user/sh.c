@@ -217,6 +217,7 @@ runit:
         argv[0] = argv0;
     }
     argv[argc] = NULL;
+    printf("\n");
     return __exec(NULL, argv);
 }
 

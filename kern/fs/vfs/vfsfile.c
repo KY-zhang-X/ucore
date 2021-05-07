@@ -73,9 +73,16 @@ int vfs_close(struct inode *node)
     return 0;
 }
 
-// unimplement
 int vfs_unlink(char *path) {
-    return -E_UNIMP;
+    int ret;
+    struct inode *dir;
+    char *name;
+    if ((ret = vfs_lookup_parent(path, &dir, &name)) != 0) {
+        return ret;
+    }
+    ret = vop_unlink(dir, name);
+    vop_ref_dec(dir);
+    return ret;
 }
 
 // unimplement
@@ -83,9 +90,22 @@ int vfs_rename(char *old_path, char *new_path) {
     return -E_UNIMP;
 }
 
-// unimplement
 int vfs_link(char *old_path, char *new_path) {
-    return -E_UNIMP;
+    int ret;
+    struct inode *dir;
+    struct inode *node;
+    char *name;
+    if ((ret = vfs_lookup(old_path, &node)) != 0) {
+        return ret;
+    }
+    if ((ret = vfs_lookup_parent(new_path, &dir, &name)) != 0) {
+        vop_ref_dec(node);
+        return ret;
+    }
+    ret = vop_link(dir, name, node);
+    vop_ref_dec(dir);
+    vop_ref_dec(node);
+    return ret;
 }
 
 // unimplement
@@ -108,6 +128,6 @@ int vfs_mkdir(char *path)
         return ret;
     }
     ret = vop_mkdir(dir, name);
-    cprintf("\nref_count:%d\n", vop_ref_dec(dir));
+    vop_ref_dec(dir);
     return ret;
 }

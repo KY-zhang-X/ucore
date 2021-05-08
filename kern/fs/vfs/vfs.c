@@ -62,6 +62,9 @@ change_bootfs(struct inode *node) {
 }
 
 // vfs_set_bootfs - change the dir of file system
+/**
+ *  
+ */
 int
 vfs_set_bootfs(char *fsname) {
     struct inode *node = NULL;
@@ -83,6 +86,9 @@ vfs_set_bootfs(char *fsname) {
 }
 
 // vfs_get_bootfs - get the inode of bootfs
+/**
+ * 返回主文件系统根节点的inode
+ */
 int
 vfs_get_bootfs(struct inode **node_store) {
     struct inode *node = NULL;

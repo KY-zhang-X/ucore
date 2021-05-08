@@ -8,6 +8,9 @@
 #include <inode.h>
 #include <assert.h>
 //called when init_main proc start
+/**
+ * init_main 进程出
+ */
 void
 fs_init(void) {
     vfs_init();
@@ -58,7 +61,6 @@ files_create(void) {
  * 进程退出时调用
  * 
  */ 
-//Called when a proc exit
 void
 files_destroy(struct files_struct *filesp) {
 //    cprintf("[files_destroy]\n");
@@ -88,7 +90,7 @@ files_closeall(struct files_struct *filesp) {
     assert(filesp != NULL && files_count(filesp) > 0);
     int i;
     struct file *file = filesp->fd_array;
-    //skip the stdin & stdout
+    //跳过stdin & stdout
     for (i = 2, file += 2; i < FILES_STRUCT_NENTRY; i ++, file ++) {
         if (file->status == FD_OPENED) {
             fd_array_close(file);

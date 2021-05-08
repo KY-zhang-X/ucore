@@ -8,8 +8,15 @@
 
 
 // open file in vfs, get/create inode for file with filename path.
+/**
+ * @brief vfs层open函数
+ *        返回或者创建路径对应的inode
+ *        openflag为读写权限
+ * 
+ */
 int vfs_open(char *path, uint32_t open_flags, struct inode **node_store) 
 {
+    /* 设置读写权限 */
     bool can_write = 0;
     switch (open_flags & O_ACCMODE) {
     case O_RDONLY:
@@ -35,25 +42,30 @@ int vfs_open(char *path, uint32_t open_flags, struct inode **node_store)
     ret = vfs_lookup(path, &node);
 
     if (ret != 0) {
-        if (ret == -16 && (create)) {
+        /* 如果文件不存在，判断create确定是否创建  */
+        if (ret == -E_NOENT && (create)) {
             char *name;
             struct inode *dir;
             if ((ret = vfs_lookup_parent(path, &dir, &name)) != 0) {
                 return ret;
             }
+            /* 下层创建文件 */
             ret = vop_create(dir, name, excl, &node);
         } else return ret;
     } else if (excl && create) {
+        /* 设置excl并以创建模式打开并且文件存在返回错误 */
         return -E_EXISTS;
     }
     assert(node != NULL);
     
+    /* 下层打开文件 */
     if ((ret = vop_open(node, open_flags)) != 0) {
         vop_ref_dec(node);
         return ret;
     }
 
     vop_open_inc(node);
+    /* 是否将创建（打开）文件将源文件覆盖 */
     if (open_flags & O_TRUNC || create) {
         if ((ret = vop_truncate(node, 0)) != 0) {
             vop_open_dec(node);

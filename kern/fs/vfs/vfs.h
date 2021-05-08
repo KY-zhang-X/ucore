@@ -154,7 +154,7 @@ const char *vfs_get_devname(struct fs *fs);
  *    vfs_symlink      - 创建一个符号链接
  *    vfs_readlink     - 读取一个 符号链接到iob中
  *    vfs_mkdir        - 创建一个目录
- *    vfs_unlink       - 删除一个 
+ *    vfs_unlink       - 删除一个连接
  *    vfs_rename       - 改变文件名称
  *    vfs_chdir        - 改变当前进程所在目录
  *    vfs_getcwd       - 返回当前进程所在目录名 
